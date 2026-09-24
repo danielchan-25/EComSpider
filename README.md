@@ -1,20 +1,22 @@
 # EComSpider
 
-EComSpider provides a FastAPI service for collecting public product data from Ozon and Wildberries. It stores tasks, products, reviews, events, and errors in a local SQLite database.
+EComSpider 是一个基于 FastAPI 的电商商品数据采集服务，支持 Ozon 和 Wildberries。服务将任务、商品、评论、运行事件和错误信息保存在本地 SQLite 数据库中。
 
-## Features
+## 功能
 
-- Submit and monitor collection tasks for Ozon and Wildberries.
-- Query collected products, reviews, task events, and errors through an authenticated API.
-- Persist results in SQLite and write rotating application logs locally.
-- Use a local Chrome instance through the Chrome DevTools Protocol (CDP) for Wildberries search.
+- 提交并查看 Ozon、Wildberries 商品采集任务。
+- 通过带令牌认证的 API 查询任务、商品、评论、事件和错误。
+- 将采集结果保存到 SQLite，并在本地生成轮转日志。
+- Wildberries 搜索通过 Chrome DevTools Protocol（CDP）使用本机 Chrome 浏览器。
 
-## Requirements
+## 环境要求
 
-- Python 3.10 or newer
-- A Chrome instance with remote debugging enabled for Wildberries collection
+- Python 3.10 或更高版本
+- 采集 Wildberries 时，需要启动启用远程调试的 Chrome 浏览器
 
-Install dependencies:
+## 安装
+
+在项目根目录打开 PowerShell，创建虚拟环境并安装依赖：
 
 ```powershell
 python -m venv .venv
@@ -22,27 +24,33 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 ```
 
-## Configuration
+## 配置
 
-Copy `.env.example` to `.env` and set a long, random `API_BOOTSTRAP_TOKEN` before starting the service. Keep `.env` private; it is ignored by Git. Optional Feishu notification settings can be configured with `FEISHU_WEBHOOK_URL` and `FEISHU_SECRET`.
+将 `.env.example` 复制为 `.env`，并在启动前为 `API_BOOTSTRAP_TOKEN` 设置足够长的随机令牌。`.env` 已加入 Git 忽略规则，请勿公开或提交该文件。
 
-Start Chrome with a remote debugging port (default `9510`) before collecting Wildberries data. Configure `BROWSER_CDP_URL` and, if needed, `WILDBERRIES_CDP_URL` in `.env` to match your local setup.
+飞书通知为可选功能，可通过 `FEISHU_WEBHOOK_URL` 和 `FEISHU_SECRET` 配置。
 
-## Run
+采集 Wildberries 前，请启动 Chrome 并开启远程调试端口，默认端口为 `9510`。如需使用其他地址，可在 `.env` 中配置 `BROWSER_CDP_URL`；也可以通过 `WILDBERRIES_CDP_URL` 单独配置 Wildberries 浏览器地址。
+
+## 启动服务
+
+安装依赖后，在项目根目录执行：
 
 ```powershell
 python run_api.py
 ```
 
-The API listens on all network interfaces (`0.0.0.0:8000`) by default so other devices on the LAN can connect. Open `http://<server-lan-ip>:8000/docs` from a LAN device. Set `APP_HOST` and `APP_PORT` in `.env` to change the bind address and port. Windows Firewall must allow inbound TCP connections on the selected port.
+Windows 用户也可以双击运行 `start_api.bat`，服务会在当前窗口前台运行。按 `Ctrl+C` 停止服务。
 
-## API usage
+服务默认监听 `0.0.0.0:8000`，因此本机和局域网内其他设备均可访问。浏览器打开 `http://127.0.0.1:8000/docs` 查看 API 文档；局域网设备请将 `127.0.0.1` 换为运行服务电脑的局域网 IP。Windows 防火墙需要允许 TCP 8000 入站。可在 `.env` 中通过 `APP_HOST` 和 `APP_PORT` 修改监听地址和端口。
 
-All `/api/*` routes require a token. The health check at `/health` does not. The example below submits a Wildberries collection task:
+## API 使用
+
+除 `/health` 外，`/api/*` 接口均需要提供有效的 API 令牌。以下示例提交一个 Wildberries 采集任务：
 
 ```powershell
-$token = '<your API_BOOTSTRAP_TOKEN>'
-$body = @{ keyword = 'cleaner'; max_products = 20 } | ConvertTo-Json
+$token = '<你的 API_BOOTSTRAP_TOKEN>'
+$body = @{ keyword = '清洁剂'; max_products = 20 } | ConvertTo-Json
 Invoke-RestMethod -Method Post `
   -Uri 'http://127.0.0.1:8000/api/tasks?platform=wildberries' `
   -ContentType 'application/json' `
@@ -50,20 +58,20 @@ Invoke-RestMethod -Method Post `
   -Body $body
 ```
 
-Use `platform=ozon` for Ozon. Available data endpoints include:
+将 `platform=wildberries` 改为 `platform=ozon` 即可提交 Ozon 任务。常用数据接口如下：
 
-| Endpoint | Purpose |
+| 接口 | 说明 |
 | --- | --- |
-| `/api/tasks` and `/api/tasks/all` | Current task status and task history |
-| `/api/products` | Products collected by a task |
-| `/api/reviews` | Reviews collected by a task |
-| `/api/events` | Task progress events |
-| `/api/errors` | Collection errors |
+| `/api/tasks`、`/api/tasks/all` | 查询任务状态和历史记录 |
+| `/api/products` | 查询任务采集到的商品 |
+| `/api/reviews` | 查询任务采集到的评论 |
+| `/api/events` | 查询任务进度事件 |
+| `/api/errors` | 查询采集错误 |
 
-Data endpoints accept a `platform` and `task_id` query parameter. See `/docs` for request and response schemas.
+数据接口需要提供 `platform` 和 `task_id` 查询参数。完整请求和响应格式请查看 `/docs`。
 
-## Data and privacy
+## 本地数据与隐私
 
-The SQLite database and logs are created under `data/` and `logs/`. They are excluded from Git because they may contain collected data or operational details. Local virtual environments, bytecode, and `.env` files are also excluded.
+SQLite 数据库和运行日志分别保存在 `data/`、`logs/` 目录中。这些目录、虚拟环境、Python 缓存和 `.env` 文件均已从 Git 中排除，避免将本地数据或配置推送到公开仓库。
 
-Only collect public data in accordance with the applicable platform terms and laws. Respect rate limits and avoid collecting or publishing personal data.
+请遵守目标平台的条款和适用法律，仅采集公开数据，并尊重访问频率限制；不要采集或公开个人数据。
